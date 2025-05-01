@@ -153,8 +153,6 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 		pubkey := sw_bls12381.NewG2Affine(pubkeyPoint)
 		pubkeys[i] = pubkey
 	}
-	agg := sw_bls12381.NewG2Affine(*aggPubKey)
-	fmt.Println("agg", agg)
 
 	sigBytes, err := hex.DecodeString("9455fd6e9ccdc6157cabf28b7a8e2e161d17a2b167ecaf055b8677f1c43365418edb71fc11b1160405cac49b8c8b1d08")
 	require.NoError(t, err)
@@ -176,12 +174,11 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 	dstG1 := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
 	msgG1, err := bls12381.HashToG1(chkBytes, dstG1)
 	require.NoError(t, err)
-	fmt.Printf("checkpoint G1 bytes %s %s\n", msgG1.X.String(), msgG1.Y.String())
 	var x [48]byte
 	var y [48]byte
 	fp.BigEndian.PutElement(&x, msgG1.X)
 	fp.BigEndian.PutElement(&y, msgG1.Y)
-	fmt.Printf("x %x, y %x\n", x, y)
+	fmt.Printf("checkpoint G1 bytes x %x, y %x\n", x, y)
 
 	var checkpointSummary []frontend.Variable
 	for _, b := range chkBytes {

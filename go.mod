@@ -31,4 +31,7 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/consensys/gnark => /Users/patrickmao/repos/gnark
+replace (
+	github.com/consensys/gnark => /Users/patrickmao/repos/gnark
+	github.com/consensys/gnark-crypto => /Users/patrickmao/repos/gnark-crypto
+)

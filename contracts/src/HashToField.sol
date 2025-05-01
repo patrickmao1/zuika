@@ -31,7 +31,7 @@ contract HashToField {
         b0Input[offset] = 0x00;
         b0Input[offset + 1] = 0x80; // for hash to G1 we need a 128-byte output
         // I2OSP(0, 1)
-        b0Input[offset + 2] = 0x80;
+        b0Input[offset + 2] = 0x00;
 
         offset = offset + 3;
 
