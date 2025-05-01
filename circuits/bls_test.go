@@ -123,10 +123,9 @@ func (c *AggSigCircuit) Define(api frontend.API) error {
 }
 
 func aggSigs(sigs []bls12381.G1Affine) *bls12381.G1Affine {
-	agg := new(bls12381.G1Affine)
-	agg.SetInfinity()
-	for _, sig := range sigs {
-		agg.Add(agg, &sig)
+	agg := &sigs[0]
+	for i := 1; i < len(sigs); i++ {
+		agg.Add(agg, &sigs[i])
 	}
 	return agg
 }

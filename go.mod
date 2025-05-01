@@ -4,10 +4,9 @@ go 1.24.1
 
 require (
 	github.com/consensys/gnark v0.12.0
-	github.com/consensys/gnark-crypto v0.17.1-0.20250413232955-6b6896cc6e82
-	github.com/patrickmao1/gnark-blake2 v0.0.0-20250416004534-98377e5f7a3e
+	github.com/consensys/gnark-crypto v0.17.1-0.20250415081852-c838dcdfa844
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.35.0
 )
 
 require (

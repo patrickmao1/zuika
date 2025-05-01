@@ -21,8 +21,7 @@ func aggPubKeys(api frontend.API, pubkeys []sw_bls12381.G2Affine, signerMap []fr
 		panic("len(pubkeys) != len(signerMap)")
 	}
 
-	z := new(bls12381.G2Affine)
-	z.SetInfinity()
+	z := new(bls12381.G2Affine).SetInfinity()
 	zero := sw_bls12381.NewG2Affine(*z)
 	g2, err := sw_bls12381.NewG2(api)
 	if err != nil {
@@ -33,7 +32,6 @@ func aggPubKeys(api frontend.API, pubkeys []sw_bls12381.G2Affine, signerMap []fr
 	for i, bit := range signerMap {
 		agg = g2.Select(bit, g2.AddUnified(agg, &pubkeys[i]), agg)
 	}
-
 	return *agg
 }
 
@@ -48,7 +46,7 @@ func signedStakeUnits(api frontend.API, stakes, signerMap []frontend.Variable) f
 	return signedStake
 }
 
-func verifySig(api frontend.API, msg []frontend.Variable, sig *sw_bls12381.G1Affine, pubkey *sw_bls12381.G2Affine) {
+func verifySig(api frontend.API, msgG1 *sw_bls12381.G1Affine, sig *sw_bls12381.G1Affine, pubkey *sw_bls12381.G2Affine) {
 	_, _, _, g2GenNative := bls12381.Generators()
 	g2Gen := sw_bls12381.NewG2Affine(g2GenNative)
 	pairing, err := sw_bls12381.NewPairing(api)
@@ -62,18 +60,18 @@ func verifySig(api frontend.API, msg []frontend.Variable, sig *sw_bls12381.G1Aff
 	if err != nil {
 		panic(err)
 	}
-	g1, err := sw_bls12381.NewG1(api)
-	if err != nil {
-		panic(err)
-	}
-	dstG1 := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
-	hm, err := g1.HashToG1(newU8Array(msg), dstG1)
-	if err != nil {
-		panic(err)
-	}
-	pairing.AssertIsOnG1(hm)
+	//g1, err := sw_bls12381.NewG1(api)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//dstG1 := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	//hm, err := g1.HashToG1(newU8Array(msg), dstG1)
+	//if err != nil {
+	//	panic(err)
+	//}
+	pairing.AssertIsOnG1(msgG1)
 
-	rhs, err := pairing.Pair([]*sw_bls12381.G1Affine{hm}, []*sw_bls12381.G2Affine{pubkey})
+	rhs, err := pairing.Pair([]*sw_bls12381.G1Affine{msgG1}, []*sw_bls12381.G2Affine{pubkey})
 	if err != nil {
 		panic(err)
 	}

@@ -14,9 +14,8 @@ type SigVerifyCircuit struct {
 	SignerMap           []frontend.Variable // bits
 	AggSig              sw_bls12381.G1Affine
 
-	SigningDigest    []frontend.Variable `gnark:",public"`
-	SignedStakeUnits frontend.Variable   `gnark:",public"`
-	CommitteeRoot    frontend.Variable   `gnark:",public"`
+	CheckpointSummaryG1 sw_bls12381.G1Affine `gnark:",public"`
+	CommitteeRoot       frontend.Variable    `gnark:",public"`
 }
 
 func (c *SigVerifyCircuit) Define(api frontend.API) error {
@@ -28,13 +27,13 @@ func (c *SigVerifyCircuit) Define(api frontend.API) error {
 	}
 
 	signedStake := signedStakeUnits(api, c.CommitteeStakeUnits, c.SignerMap)
-	api.AssertIsEqual(signedStake, c.SignedStakeUnits)
+	api.AssertIsLessOrEqual(6667, signedStake)
 
 	committeeRoot := commitPubKeys(api, c.CommitteePubKeys)
 	api.AssertIsEqual(committeeRoot, c.CommitteeRoot)
 
 	aggPubkey := aggPubKeys(api, c.CommitteePubKeys, c.SignerMap)
-	verifySig(api, c.SigningDigest[:], &c.AggSig, &aggPubkey)
+	verifySig(api, &c.CheckpointSummaryG1, &c.AggSig, &aggPubkey)
 
 	return nil
 }

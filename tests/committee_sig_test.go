@@ -5,35 +5,117 @@ import (
 	"fmt"
 	"github.com/consensys/gnark-crypto/ecc"
 	bls12381 "github.com/consensys/gnark-crypto/ecc/bls12-381"
+	"github.com/consensys/gnark-crypto/ecc/bls12-381/fp"
 	"github.com/consensys/gnark/backend"
+	"github.com/consensys/gnark/backend/groth16"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
 	"github.com/consensys/gnark/test"
 	"github.com/patrickmao1/zuika/circuits"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/blake2b"
 	"math/big"
+	"os"
 	"testing"
+	"time"
 )
 
-func TestCompile(t *testing.T) {
+func TestCompileAndSetup(t *testing.T) {
 	c := buildTestCircuit(t)
-	ccs, err := frontend.Compile(ecc.BLS12_381.ScalarField(), r1cs.NewBuilder, c)
+	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), r1cs.NewBuilder, c)
 	require.NoError(t, err)
 	fmt.Println("constraints", ccs.GetNbConstraints())
+
+	// save ccs
+	f, err := os.OpenFile("../build/ccs", os.O_RDWR|os.O_CREATE, 0666)
+	require.NoError(t, err)
+	_, err = ccs.WriteTo(f)
+	require.NoError(t, err)
+	fmt.Println("ccs saved")
+
+	// setup
+	fmt.Println("setup")
+	pk, vk, err := groth16.Setup(ccs)
+	require.NoError(t, err)
+
+	// save pk
+	f, err = os.OpenFile("../build/pk", os.O_RDWR|os.O_CREATE, 0666)
+	require.NoError(t, err)
+	_, err = pk.WriteTo(f)
+	require.NoError(t, err)
+	fmt.Println("pk saved")
+
+	// save vk
+	f, err = os.OpenFile("../build/vk", os.O_RDWR|os.O_CREATE, 0666)
+	require.NoError(t, err)
+	_, err = vk.WriteTo(f)
+	fmt.Println("vk saved")
+
+	// save solidity verifier
+	fmt.Println("export solidity")
+	f, err = os.OpenFile("../build/committee_sig_contract.sol", os.O_RDWR|os.O_CREATE, 0666)
+	require.NoError(t, err)
+	err = vk.ExportSolidity(f)
+	require.NoError(t, err)
+	fmt.Println("exported solidity")
+}
+
+func TestProve(t *testing.T) {
+	a := buildTestCircuit(t)
+
+	ccs := groth16.NewCS(ecc.BN254)
+	pk := groth16.NewProvingKey(ecc.BN254)
+	vk := groth16.NewVerifyingKey(ecc.BN254)
+
+	// read ccs
+	f, err := os.OpenFile("../build/ccs", os.O_RDONLY, 0666)
+	require.NoError(t, err)
+	_, err = ccs.ReadFrom(f)
+	require.NoError(t, err)
+
+	// read pk
+	f, err = os.OpenFile("../build/pk", os.O_RDONLY, 0666)
+	_, err = pk.ReadFrom(f)
+	require.NoError(t, err)
+
+	// read vk
+	f, err = os.OpenFile("../build/vk", os.O_RDONLY, 0666)
+	_, err = vk.ReadFrom(f)
+	require.NoError(t, err)
+
+	// generate witness
+	fmt.Println("witness")
+	w, err := frontend.NewWitness(a, ecc.BN254.ScalarField())
+	require.NoError(t, err)
+	wpub, err := w.Public()
+	require.NoError(t, err)
+
+	// prove
+	fmt.Println("prove")
+	proof, err := groth16.Prove(ccs, pk, w)
+	require.NoError(t, err)
+	f, err = os.OpenFile("../build/proof_"+time.Now().String(), os.O_RDWR|os.O_CREATE, 0666)
+	require.NoError(t, err)
+	_, err = proof.WriteTo(f)
+	require.NoError(t, err)
+
+	fmt.Println("verify")
+	err = groth16.Verify(proof, vk, wpub)
+	require.NoError(t, err)
 }
 
 func TestSigVerify(t *testing.T) {
 	c := buildTestCircuit(t)
 	a := buildTestCircuit(t)
 	assert := test.NewAssert(t)
-	assert.SolvingSucceeded(c, a, test.WithBackends(backend.GROTH16), test.WithCurves(ecc.BLS12_381))
+	assert.SolvingSucceeded(c, a, test.WithBackends(backend.GROTH16), test.WithCurves(ecc.BN254))
 }
 
 func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
-	const numMaxAuthorities = 113
+	const numMaxAuthorities = 120
+	//const numMaxAuthorities = 1
 
+	fmt.Println("num authorities", len(pubkeysHex))
 	pubkeyBytes := make([][]byte, len(pubkeysHex))
 	for i := range pubkeyBytes {
 		bs, err := hex.DecodeString(pubkeysHex[i])
@@ -41,8 +123,21 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 		pubkeyBytes[i] = bs
 	}
 
+	_signerMap := []frontend.Variable{0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0}
+	signerMap := make([]frontend.Variable, numMaxAuthorities)
+	for i := range signerMap {
+		signerMap[i] = 0
+	}
+	copy(signerMap, _signerMap)
+
 	pubkeys := make([]sw_bls12381.G2Affine, numMaxAuthorities)
+	aggPubKey := new(bls12381.G2Affine).SetInfinity()
 	for i := range pubkeys {
+		// TODO remove hack
+		//if i > 0 {
+		//	break
+		//}
+
 		var pubkeyPoint bls12381.G2Affine
 
 		if i < len(pubkeyBytes) {
@@ -52,9 +147,14 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 		} else {
 			pubkeyPoint.SetInfinity()
 		}
+		if signerMap[i] == 1 {
+			aggPubKey.Add(aggPubKey, &pubkeyPoint)
+		}
 		pubkey := sw_bls12381.NewG2Affine(pubkeyPoint)
 		pubkeys[i] = pubkey
 	}
+	agg := sw_bls12381.NewG2Affine(*aggPubKey)
+	fmt.Println("agg", agg)
 
 	sigBytes, err := hex.DecodeString("9455fd6e9ccdc6157cabf28b7a8e2e161d17a2b167ecaf055b8677f1c43365418edb71fc11b1160405cac49b8c8b1d08")
 	require.NoError(t, err)
@@ -62,8 +162,6 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 	_, err = sigG1.SetBytes(sigBytes)
 	require.NoError(t, err)
 	sig := sw_bls12381.NewG1Affine(sigG1)
-
-	signerMap := []frontend.Variable{0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0, 0}
 
 	if len(stakes) < numMaxAuthorities {
 		stakes = append(stakes, make([]int, numMaxAuthorities-len(stakes))...)
@@ -73,23 +171,23 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 		committeeStakeUnits[i] = stakes[i]
 	}
 
-	signedStakeUnits := 0
-	for i, b := range signerMap {
-		signedStakeUnits += stakes[i] * b.(int)
-	}
+	chkBytes, err := hex.DecodeString("020000e0020000000000007d870b08000000007c491ecb0000000020e767c5b2706f4d810d28664f9b5b0731d085156a3afcb72ddf67373cdf99057f012067d6d26500b1403a1a464cbd64d0aa61e02eace13f2c267f970f70bd3ed4fd38000000000000000000000000000000000000000000000000000000000000000038aed544960100000000020000e002000000000000")
+	require.NoError(t, err)
+	dstG1 := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	msgG1, err := bls12381.HashToG1(chkBytes, dstG1)
+	require.NoError(t, err)
+	fmt.Printf("checkpoint G1 bytes %s %s\n", msgG1.X.String(), msgG1.Y.String())
+	var x [48]byte
+	var y [48]byte
+	fp.BigEndian.PutElement(&x, msgG1.X)
+	fp.BigEndian.PutElement(&y, msgG1.Y)
+	fmt.Printf("x %x, y %x\n", x, y)
 
-	chkBytes, err := hex.DecodeString("020000e0020000000000007d870b08000000007c491ecb0000000020e767c5b2706f4d810d28664f9b5b0731d085156a3afcb72ddf67373cdf99057f012067d6d26500b1403a1a464cbd64d0aa61e02eace13f2c267f970f70bd3ed4fd38000000000000000000000000000000000000000000000000000000000000000038aed544960100000000020000")
-	require.NoError(t, err)
-	h, err := blake2b.New(32, nil)
-	require.NoError(t, err)
-	h.Write(chkBytes)
-	hash := h.Sum(nil)
-	var signingDigest [32]frontend.Variable
-	for i, b := range hash {
-		signingDigest[i] = b
+	var checkpointSummary []frontend.Variable
+	for _, b := range chkBytes {
+		checkpointSummary = append(checkpointSummary, b)
 	}
-	//cr, err := hex.DecodeString("373F897DDF7ECCD01CDD54B211F77AE02BD31661BF35D92A0941E35592018370")
-	cr, err := hex.DecodeString("6FE5216A1CA6C0E0B0871027CEDA442FEA47D2EF38ADB53CD9D893638CBDA02F")
+	cr, err := hex.DecodeString("1CF2542241BF7DF9DD50FC28DB1EB8104D7C293D6F53378D17D9688327C7AFBB")
 	require.NoError(t, err)
 
 	return &circuits.SigVerifyCircuit{
@@ -97,8 +195,7 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 		CommitteeStakeUnits: committeeStakeUnits,
 		SignerMap:           signerMap,
 		AggSig:              sig,
-		SigningDigest:       signingDigest,
-		SignedStakeUnits:    signedStakeUnits,
+		CheckpointSummaryG1: sw_bls12381.NewG1Affine(msgG1),
 		CommitteeRoot:       new(big.Int).SetBytes(cr),
 	}
 }
