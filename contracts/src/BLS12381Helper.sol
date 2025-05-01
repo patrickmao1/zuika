@@ -5,7 +5,7 @@
 
 pragma solidity ^0.8.29;
 
-contract HashToField {
+contract BLS12381Helper {
     uint8 private constant MOD_EXP_PRECOMPILE_ADDRESS = 0x5;
     uint8 private constant BLS12_381_MAP_G1_PRECOMPILE_ADDRESS = 0x10;
     // Note: the last char "+" results from RFC9380: DST_prime = DST || I2OSP(len(DST), 1), which is 0x43, which is "+" in ascii

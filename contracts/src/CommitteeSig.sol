@@ -3,7 +3,7 @@
 pragma solidity ^0.8.29;
 
 import "./CommitteeSigVerifier.sol";
-import {HashToField} from "./HashToField.sol";
+import {BLS12381Helper} from "./BLS12381Helper.sol";
 
 contract CommitteeSigVerifier {
 
