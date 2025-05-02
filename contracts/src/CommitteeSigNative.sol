@@ -2,6 +2,8 @@
 
 pragma solidity ^0.8.29;
 
+import {BLS12381Helper} from "./BLS12381Helper.sol";
+
 contract CommitteeSigVerifier {
 
 
@@ -17,7 +19,7 @@ contract CommitteeSigVerifier {
         pubkeys = _pubkeys;
     }
 
-    function verifySig(bytes memory checkpointSummary, uint256 signerMap) public returns (bool) {
+    function verifySig(bytes memory checkpointSummary, BLS12381Helper.G1Point memory sig, uint256 signerMap) public returns (bool) {
 
         return false;
     }
