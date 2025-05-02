@@ -8,11 +8,14 @@ import (
 	"github.com/consensys/gnark-crypto/ecc/bls12-381/fp"
 	"github.com/consensys/gnark/backend"
 	"github.com/consensys/gnark/backend/groth16"
+	bn254 "github.com/consensys/gnark/backend/groth16/bn254"
+	"github.com/consensys/gnark/backend/solidity"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/r1cs"
 	"github.com/consensys/gnark/std/algebra/emulated/sw_bls12381"
 	"github.com/consensys/gnark/test"
 	"github.com/patrickmao1/zuika/circuits"
+	"github.com/patrickmao1/zuika/utils"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"os"
@@ -92,7 +95,7 @@ func TestProve(t *testing.T) {
 
 	// prove
 	fmt.Println("prove")
-	proof, err := groth16.Prove(ccs, pk, w)
+	proof, err := groth16.Prove(ccs, pk, w, solidity.WithProverTargetSolidityVerifier(backend.GROTH16))
 	require.NoError(t, err)
 	f, err = os.OpenFile("../build/proof_"+time.Now().String(), os.O_RDWR|os.O_CREATE, 0666)
 	require.NoError(t, err)
@@ -100,8 +103,24 @@ func TestProve(t *testing.T) {
 	require.NoError(t, err)
 
 	fmt.Println("verify")
-	err = groth16.Verify(proof, vk, wpub)
+	err = groth16.Verify(proof, vk, wpub, solidity.WithVerifierTargetSolidityVerifier(backend.GROTH16))
 	require.NoError(t, err)
+
+	pubBytes, err := wpub.MarshalBinary()
+	require.NoError(t, err)
+	fmt.Printf("pub input bytes %x\n", pubBytes)
+
+	pb := proof.(*bn254.Proof).MarshalSolidity()
+	fmt.Printf("marshal solidity %x\n", pb)
+
+	p, commitments, commitmentPoK := utils.ExportProofForSolidity(proof)
+	for i, v := range p {
+		fmt.Printf("p[%d] %x\n", i, v)
+	}
+	fmt.Printf("commitments[0] %x", commitments[0].Bytes())
+	fmt.Printf("commitments[1] %x", commitments[1].Bytes())
+	fmt.Printf("commitmentPoK[0] %x", commitmentPoK[0].Bytes())
+	fmt.Printf("commitmentPoK[1] %x", commitmentPoK[1].Bytes())
 }
 
 func TestSigVerify(t *testing.T) {
@@ -133,11 +152,6 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 	pubkeys := make([]sw_bls12381.G2Affine, numMaxAuthorities)
 	aggPubKey := new(bls12381.G2Affine).SetInfinity()
 	for i := range pubkeys {
-		// TODO remove hack
-		//if i > 0 {
-		//	break
-		//}
-
 		var pubkeyPoint bls12381.G2Affine
 
 		if i < len(pubkeyBytes) {

@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 
 // Code taken from https://github.com/ralexstokes/deposit-verifier/blob/8da90a8f6fc686ab97506fd0d84568308b72f133/deposit_verifier.sol
-// with some modifications to adapt to the G1 version of hash-to-field
+// with modifications to adapt to the G1 version of hash-to-field
 
 pragma solidity ^0.8.29;
 
+import "../lib/forge-std/src/console.sol";
+
 contract BLS12381Helper {
     uint8 private constant MOD_EXP_PRECOMPILE_ADDRESS = 0x5;
+    uint8 private constant BLS12_381_G1_ADD_ADDRESS = 0x0b;
     uint8 private constant BLS12_381_MAP_G1_PRECOMPILE_ADDRESS = 0x10;
     // Note: the last char "+" results from RFC9380: DST_prime = DST || I2OSP(len(DST), 1), which is 0x43, which is "+" in ascii
     string private constant BLS_SIG_DST_PRIME = "BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_+";
@@ -14,6 +17,46 @@ contract BLS12381Helper {
     struct Fp {
         uint a;
         uint b;
+    }
+
+    struct G1Point {
+        Fp X;
+        Fp Y;
+    }
+
+    function addG1(G1Point memory a, G1Point memory b) public view returns (G1Point memory) {
+        uint[8] memory input;
+        input[0] = a.X.a;
+        input[1] = a.X.b;
+        input[2] = a.Y.a;
+        input[3] = a.Y.b;
+
+        input[4] = b.X.a;
+        input[5] = b.X.b;
+        input[6] = b.Y.a;
+        input[7] = b.Y.b;
+
+        uint[4] memory output;
+
+        bool success;
+        assembly {
+            success := staticcall(
+                sub(gas(), 2000),
+                BLS12_381_G1_ADD_ADDRESS,
+                input,
+                256,
+                output,
+                128
+            )
+        // Use "invalid" to make gas estimation work
+            switch success case 0 {invalid()}
+        }
+        require(success, "call to addition in G2 precompile failed");
+
+        return G1Point(
+            Fp(output[0], output[1]),
+            Fp(output[2], output[3])
+        );
     }
 
     function expandMessage(bytes memory message) public pure returns (bytes memory) {
@@ -137,6 +180,37 @@ contract BLS12381Helper {
         return result;
     }
 
+    function mapG1(Fp memory el) public view returns (G1Point memory result) {
+        uint[2] memory input;
+        input[0] = el.a;
+        input[1] = el.b;
+        for (uint i = 0; i < 2; i++) {
+            console.logUint(input[i]);
+        }
+
+        uint[4] memory output;
+
+        bool success;
+        assembly {
+            success := staticcall(
+                sub(gas(), 2000),
+                BLS12_381_MAP_G1_PRECOMPILE_ADDRESS,
+                input,
+                64,
+                output,
+                128
+            )
+        // Use "invalid" to make gas estimation work
+            switch success case 0 {invalid()}
+        }
+        require(success, "call to map to curve precompile failed");
+
+        return G1Point(
+            Fp(output[0], output[1]),
+            Fp(output[2], output[3])
+        );
+    }
+
     function convertSliceToFp(bytes memory data, uint start, uint end) private view returns (Fp memory) {
         bytes memory fieldElement = reduceModulo(data, start, end);
         uint a = sliceToUint(fieldElement, 0, 16);
@@ -149,5 +223,12 @@ contract BLS12381Helper {
         result[0] = convertSliceToFp(some_bytes, 0, 64);
         result[1] = convertSliceToFp(some_bytes, 64, 128);
         return result;
+    }
+
+    function hashToG1(bytes memory message) public view returns (G1Point memory g1) {
+        Fp[2] memory els = hashToField(message);
+        G1Point memory point1 = mapG1(els[0]);
+        G1Point memory point2 = mapG1(els[1]);
+        return addG1(point1, point2);
     }
 }
