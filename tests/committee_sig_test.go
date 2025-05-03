@@ -186,6 +186,18 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 	chkBytes, err := hex.DecodeString("020000e0020000000000007d870b08000000007c491ecb0000000020e767c5b2706f4d810d28664f9b5b0731d085156a3afcb72ddf67373cdf99057f012067d6d26500b1403a1a464cbd64d0aa61e02eace13f2c267f970f70bd3ed4fd38000000000000000000000000000000000000000000000000000000000000000038aed544960100000000020000e002000000000000")
 	require.NoError(t, err)
 	dstG1 := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	fields, err := fp.Hash(chkBytes, dstG1, 2)
+	require.NoError(t, err)
+	f0, f1 := fields[0].Bytes(), fields[1].Bytes()
+	fmt.Printf("hashToField %x %x\n", f0, f1)
+	var f0s, f1s [3]frontend.Variable
+	f0s[0] = new(big.Int).SetBytes(f0[:16])
+	f0s[1] = new(big.Int).SetBytes(f0[16:32])
+	f0s[2] = new(big.Int).SetBytes(f0[32:48])
+	f1s[0] = new(big.Int).SetBytes(f1[:16])
+	f1s[1] = new(big.Int).SetBytes(f1[16:32])
+	f1s[2] = new(big.Int).SetBytes(f1[32:48])
+
 	msgG1, err := bls12381.HashToG1(chkBytes, dstG1)
 	require.NoError(t, err)
 	var x [48]byte
@@ -194,20 +206,17 @@ func buildTestCircuit(t *testing.T) *circuits.SigVerifyCircuit {
 	fp.BigEndian.PutElement(&y, msgG1.Y)
 	fmt.Printf("checkpoint G1 bytes x %x, y %x\n", x, y)
 
-	var checkpointSummary []frontend.Variable
-	for _, b := range chkBytes {
-		checkpointSummary = append(checkpointSummary, b)
-	}
 	cr, err := hex.DecodeString("1CF2542241BF7DF9DD50FC28DB1EB8104D7C293D6F53378D17D9688327C7AFBB")
 	require.NoError(t, err)
 
 	return &circuits.SigVerifyCircuit{
-		CommitteePubKeys:    pubkeys,
-		CommitteeStakeUnits: committeeStakeUnits,
-		SignerMap:           signerMap,
-		AggSig:              sig,
-		CheckpointSummaryG1: sw_bls12381.NewG1Affine(msgG1),
-		CommitteeRoot:       new(big.Int).SetBytes(cr),
+		CommitteePubKeys:         pubkeys,
+		CommitteeStakeUnits:      committeeStakeUnits,
+		SignerMap:                signerMap,
+		AggSig:                   sig,
+		CheckpointSummaryFields0: f0s,
+		CheckpointSummaryFields1: f1s,
+		CommitteeRoot:            new(big.Int).SetBytes(cr),
 	}
 }
 
