@@ -8,6 +8,7 @@ import (
 	"github.com/consensys/gnark/std/hash/mimc"
 	"github.com/consensys/gnark/std/math/emulated"
 	"github.com/consensys/gnark/std/rangecheck"
+	"math/big"
 	"slices"
 )
 
@@ -21,10 +22,12 @@ type SigVerifyCircuit struct {
 	SignerMap           []frontend.Variable // bits
 	AggSig              sw_bls12381.G1Affine
 
-	// big-endian limbs, each limb is 128 bits
-	CheckpointSummaryFields0 [3]frontend.Variable `gnark:",public"`
-	CheckpointSummaryFields1 [3]frontend.Variable `gnark:",public"`
-	CommitteeRoot            frontend.Variable    `gnark:",public"`
+	// expandMessageXmd output is 128 byte. split in middle and distributed each 64-byte slice to
+	// 3 u248 limbs
+	// 64 bytes
+	CheckpointSummaryExpanded0 [3]frontend.Variable `gnark:",public"`
+	CheckpointSummaryExpanded1 [3]frontend.Variable `gnark:",public"`
+	CommitteeRoot              frontend.Variable    `gnark:",public"`
 }
 
 func (c *SigVerifyCircuit) Define(api frontend.API) error {
@@ -51,10 +54,18 @@ func (c *SigVerifyCircuit) Define(api frontend.API) error {
 	committeeRoot := commitPubKeys(api, c.CommitteePubKeys)
 	api.AssertIsEqual(committeeRoot, c.CommitteeRoot)
 
-	chkG1, err := c.fieldsToG1(c.CheckpointSummaryFields0, c.CheckpointSummaryFields1)
+	el0 := c.u248LimbsToElement(c.CheckpointSummaryExpanded0)
+	el1 := c.u248LimbsToElement(c.CheckpointSummaryExpanded1)
+	q0, err := c.g1.MapToG1(el0)
 	if err != nil {
 		return err
 	}
+	q1, err := c.g1.MapToG1(el1)
+	if err != nil {
+		return err
+	}
+	chkG1 := c.addG1(q0, q1)
+
 	fmt.Printf("chkG1: %x %x\n", chkG1.X.Limbs, chkG1.Y.Limbs)
 	aggPubkey := aggPubKeys(api, c.CommitteePubKeys, c.SignerMap)
 	verifySig(api, chkG1, &c.AggSig, &aggPubkey)
@@ -178,4 +189,45 @@ func commitPubKeys(api frontend.API, pubkeys []sw_bls12381.G2Affine) frontend.Va
 		h.Write(pubkey.P.X.A1.Limbs...)
 	}
 	return h.Sum()
+}
+
+func (c *SigVerifyCircuit) u248LimbsToElement(limbs [3]frontend.Variable) *emulated.Element[emulated.BLS12381Fp] {
+	api := c.api
+	fp := c.curveF
+
+	// input is big-endian, we need little-endian
+	slices.Reverse(limbs[:])
+
+	// Input is 512 bits in three 248-bit limbs
+	// The first limb contains only 2 bytes
+
+	bits := make([]frontend.Variable, 0, 512)
+	l0 := api.ToBinary(limbs[0], 256)
+	for _, b := range l0[248:] {
+		api.AssertIsEqual(b, 0) // range check 248 bits
+	}
+	bits = append(bits, l0[:248]...)
+
+	l1 := api.ToBinary(limbs[1], 256)
+	for _, b := range l1[248:] {
+		api.AssertIsEqual(b, 0) // range check 248 bits
+	}
+	bits = append(bits, l1[:248]...)
+
+	l2 := api.ToBinary(limbs[2], 256)
+	for _, b := range l2[16:] {
+		api.AssertIsEqual(b, 0) // range check 16 bits
+	}
+	bits = append(bits, l2[:16]...)
+
+	cutoff := 17
+	tailBits, headBits := bits[:cutoff*8], bits[cutoff*8:]
+	tail := fp.FromBits(tailBits...)
+	head := fp.FromBits(headBits...)
+
+	byteMultiplier := big.NewInt(256)
+	headMultiplier := byteMultiplier.Exp(byteMultiplier, big.NewInt(int64(cutoff)), big.NewInt(0))
+	head = fp.MulConst(head, headMultiplier)
+
+	return fp.Add(head, tail)
 }
