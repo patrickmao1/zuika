@@ -5,7 +5,6 @@ pragma solidity ^0.8.29;
 import "./Verifier.sol";
 import {BLS12381Helper} from "./BLS12381Helper.sol";
 import {Bytes} from "@openzeppelin/contracts/utils/Bytes.sol";
-import {console} from "forge-std/Test.sol";
 
 contract ZKLightClient {
     struct CheckpointData {
@@ -31,8 +30,6 @@ contract ZKLightClient {
 
     function updateCheckpoint(bytes calldata checkpointIntent, bytes memory zkProof) public {
         bytes memory xmd = bls.expandMessage(checkpointIntent);
-        console.logBytes(checkpointIntent);
-
         uint256[3] memory fp0 = bytesToLimbs(Bytes.slice(xmd, 0, 64));
         uint256[3] memory fp1 = bytesToLimbs(Bytes.slice(xmd, 64, 128));
 
@@ -44,9 +41,9 @@ contract ZKLightClient {
     }
 
     function bytesToLimbs(bytes memory b) internal pure returns (uint256[3] memory limbs) {
-        limbs[0] = uint256(bytes32(Bytes.slice(b, 0, 2)));
-        limbs[1] = uint256(bytes32(Bytes.slice(b, 2, 33)));
-        limbs[2] = uint256(bytes32(Bytes.slice(b, 33, 64)));
+        limbs[0] = uint256(uint16(bytes2(Bytes.slice(b, 0, 2))));
+        limbs[1] = uint256(uint248(bytes31(Bytes.slice(b, 2, 33))));
+        limbs[2] = uint256(uint248(bytes31(Bytes.slice(b, 33, 64))));
         return limbs;
     }
 
