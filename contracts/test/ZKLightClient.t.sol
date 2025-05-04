@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.29;
 
-import "../src/BLS12381Helper.sol";
+import "../src/BLS12381.sol";
 import {Test, console} from "forge-std/Test.sol";
 import {Verifier} from "../src/Verifier.sol";
 import {ZKLightClient} from "../src/ZKLightClient.sol";
@@ -9,20 +9,20 @@ import {ZKLightClient} from "../src/ZKLightClient.sol";
 contract CommitteeSigVerifierTest is Test {
     ZKLightClient public lightClient;
     Verifier public zkVerifier;
-    BLS12381Helper public bls;
+    BLS12381 public bls;
 
     function setUp() public {
-        bls = new BLS12381Helper();
+        bls = new BLS12381();
         zkVerifier = new Verifier();
         lightClient = new ZKLightClient(address(zkVerifier), address(bls));
     }
 
-    function test_verifySig() public {
+    function test_verifyProof() public {
         bytes memory proof =
             hex"1e4faaff114f36eea30e480d6b2d659e954517bf212a763c285966e066788b92063980ec0121e460ff25f259d5be91c0fe16142c054ef610751881a4b870851f0a001c45d9b54eb40290cffd4cd48ae1d037d5a672c5bd403fd8057a92926db408f67d4b9bcfe7a5556395e800377b4a234407ef3e9805955a882f6e877e1b351c6d65d02a5a08b48a0a6c464259eae6e45fb863c42d4b5fd956d7869dcff77a1be39417bdc613ffba42bf831e85f29fe3c4e0f4b9585bf532f95eb04d2adf8417390224f62272300999b0c7184dbf527bbab4bf0fe0674a99bd336a94f0a8d9101e8add4b92dd351e43f63041ba3dab741da442ef1b7851e8a6ac0bc0d491460eb13b6073d65cebfd73ddcc77194dd69f0efc4037bfe3756b1f0a0fb7fe9ab80fa3794bb603f6d64ab60954c118719aba00a81ee31aa5e11e510926618275240a147d76fab7da5ec71f8cc63e2e84275956f25b737281286ba0157aab50a07624a25cbf99443c32fad338fdbd65991fbbf6135f7aae6c00a9b745e5b201ff9e";
         bytes memory input =
             hex"00000000000000000000000000000000000000000000000000000000000073ec00811bf8564f6219db07ec09046e9da334dcefd0a3ee8124253173639d3bceb00004f7932dd4cc0e13a4dd5e9af3756e95209f8a2a6fb98d50cb5a33fdb6e03a000000000000000000000000000000000000000000000000000000000000800300d3886768424cdddad753bcb0c88038a84d3c2bc799fe541edf37e77fa9788e00e34fa27b85562bffd3e45761c20e8b4af8e2c9b94ac6fcd9f9e0a8217431df1cf2542241bf7df9dd50fc28db1eb8104d7c293d6f53378d17d9688327c7afbb";
-        bool success = lightClient.verifySig(proof, input);
+        bool success = lightClient.verifyProof(proof, input);
         assert(success);
     }
 
