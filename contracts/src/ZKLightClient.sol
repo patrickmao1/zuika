@@ -13,7 +13,7 @@ contract ZKLightClient {
         uint64 contentDigest;
         uint64 previousDigest;
     }
-    
+
     event Verified(CheckpointData data);
 
     BLS12381 public bls;
@@ -37,7 +37,7 @@ contract ZKLightClient {
         require(pass, "invalid sig");
 
         CheckpointData memory data = extractCheckpointData(checkpointIntent);
-        // emit Verified(data);
+        emit Verified(data);
     }
 
     function bytesToLimbs(bytes memory b) internal pure returns (uint256[3] memory limbs) {
@@ -49,10 +49,10 @@ contract ZKLightClient {
 
     function extractCheckpointData(bytes calldata checkpoint) internal pure returns (CheckpointData memory data) {
         data = CheckpointData(
-            uint64(bytes8(checkpoint[0:8])),
-            uint64(bytes8(checkpoint[8:16])),
-            uint64(bytes8(checkpoint[8:16])),
-            uint64(bytes8(checkpoint[16:24]))
+            uint64(bytes8(checkpoint[0 : 8])),
+            uint64(bytes8(checkpoint[8 : 16])),
+            uint64(bytes8(checkpoint[8 : 16])),
+            uint64(bytes8(checkpoint[16 : 24]))
         );
     }
 
