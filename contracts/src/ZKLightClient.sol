@@ -49,10 +49,10 @@ contract ZKLightClient {
 
     function extractCheckpointData(bytes calldata checkpoint) internal pure returns (CheckpointData memory data) {
         data = CheckpointData(
-            uint64(bytes8(checkpoint[0 : 8])),
-            uint64(bytes8(checkpoint[8 : 16])),
-            uint64(bytes8(checkpoint[8 : 16])),
-            uint64(bytes8(checkpoint[16 : 24]))
+            uint64(bytes8(checkpoint[0:8])),
+            uint64(bytes8(checkpoint[8:16])),
+            uint64(bytes8(checkpoint[8:16])),
+            uint64(bytes8(checkpoint[16:24]))
         );
     }
 

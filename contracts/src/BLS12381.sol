@@ -5,14 +5,12 @@
 
 pragma solidity ^0.8.29;
 
-import "../lib/forge-std/src/console.sol";
-
 contract BLS12381 {
     uint8 private constant MOD_EXP_PRECOMPILE_ADDRESS = 0x5;
     uint8 private constant BLS12_381_G1_ADD_ADDRESS = 0x0b;
     uint8 private constant BLS12_381_G2_ADD_ADDRESS = 0x0d;
     uint8 private constant BLS12_381_MAP_G1_PRECOMPILE_ADDRESS = 0x10;
-    uint8 private constant BLS12_381_PAIRING_PRECOMPILE_ADDRESS = 0x10;
+    uint8 private constant BLS12_381_PAIRING_PRECOMPILE_ADDRESS = 0x0f;
 
     bytes1 private constant BLS_BYTE_WITHOUT_FLAGS_MASK = bytes1(0x1f);
 
@@ -227,9 +225,6 @@ contract BLS12381 {
         uint256[2] memory input;
         input[0] = el.a;
         input[1] = el.b;
-        for (uint256 i = 0; i < 2; i++) {
-            console.logUint(input[i]);
-        }
 
         uint256[4] memory output;
 

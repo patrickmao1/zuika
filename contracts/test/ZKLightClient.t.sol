@@ -6,7 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {Verifier} from "../src/Verifier.sol";
 import {ZKLightClient} from "../src/ZKLightClient.sol";
 
-contract CommitteeSigVerifierTest is Test {
+contract ZKLightClientTest is Test {
     ZKLightClient public lightClient;
     Verifier public zkVerifier;
     BLS12381 public bls;
